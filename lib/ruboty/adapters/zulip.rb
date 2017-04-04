@@ -7,33 +7,27 @@ module Ruboty
       env :ZULIP_SITE, "Zulip site URL"
       env :ZULIP_USERNAME, "Zulip username (email address)"
       env :ZULIP_API_KEY, "Zulip API key"
-      env :ZULIP_STREAM, "Zulip stream name"
+      env :ZULIP_STREAM, "Zulip stream name to monitor", optional: true
+      env :ZULIP_TOPIC, "Zulip topic name to monitor", optional: true
 
       def run
         listen
       end
 
       def say(message)
-        to = case message.dig(:original, :type)
-             when :stream
-               message.dig(:original, :display_recipient)
-             when :private
-               message.dig(:original, :display_recipient).map do |recipient|
-                 recipient[:email]
-               end
-             end
+        message_type = message.dig(:original, :type).to_sym
         client.send_message(
-          type: message[:original][:type],
-          to: to,
-          subject: message[:subject],
-          content: message[:content]
+          type: message_type,
+          to: message.dig(:original, :to),
+          subject: message.dig(:original, :subject),
+          content: message[:body]
         )
       end
 
       private
 
       def client
-        @client ||= Zulip::Client.new(site: site, username: username, api_key: api_key)
+        @client ||= ::Zulip::Client.new(site: site, username: username, api_key: api_key)
       end
 
       def site
@@ -48,9 +42,34 @@ module Ruboty
         ENV["ZULIP_API_KEY"]
       end
 
+      def stream_name
+        ENV["ZULIP_STREAM"]
+      end
+
+      def topic
+        ENV["ZULIP_TOPIC"]
+      end
+
       def listen
-        client.each_message do |event|
-          robot.receive(event[:message])
+        client.stream_message do |message|
+          message[:body] = message[:content]
+          robot.receive(
+            body: message[:content],
+            from: message[:sender_email],
+            from_name: message[:sender_full_name],
+            to: display_recipient(message),
+            type: message[:type],
+            subject: message[:subject],
+          )
+        end
+      end
+
+      def display_recipient(message)
+        case message[:type].to_sym
+        when :stream
+          message[:display_recipient]
+        when :private
+          message[:display_recipient].map {|recipient| recipient[:email] }
         end
       end
     end
