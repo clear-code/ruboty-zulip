@@ -9,6 +9,7 @@ module Ruboty
       env :ZULIP_API_KEY, "Zulip API key"
       env :ZULIP_STREAM, "Zulip stream name to monitor", optional: true
       env :ZULIP_TOPIC, "Zulip topic name to monitor", optional: true
+      env :ZULIP_USE_SSL, "Use SSL/TLS to access Zulip ", optional: true
 
       def run
         listen
@@ -27,7 +28,9 @@ module Ruboty
       private
 
       def client
-        @client ||= ::Zulip::Client.new(site: site, username: username, api_key: api_key)
+        options = {}
+        options[:ssl] = { verify: use_ssl? }
+        @client ||= ::Zulip::Client.new(site: site, username: username, api_key: api_key, **options)
       end
 
       def site
@@ -48,6 +51,10 @@ module Ruboty
 
       def topic
         ENV["ZULIP_TOPIC"]
+      end
+
+      def use_ssl?
+        /true|yes/i === ENV.fetch("ZULIP_USE_SSL", "true")
       end
 
       def listen
