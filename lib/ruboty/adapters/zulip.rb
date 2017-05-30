@@ -69,7 +69,7 @@ module Ruboty
             subject: message[:subject],
           )
         end
-      rescue Zulip::ResponseError => ex
+      rescue ::Zulip::ResponseError => ex
         Ruboty.logger.warn("#{ex.class}: #{ex.message}\n#{ex.backtrace.join("\n")}")
         retry
       end
