@@ -4,5 +4,5 @@ source 'https://rubygems.org'
 gemspec
 
 if File.exist?("../ruby-zulip-client")
-gem "zulip-client", path: "../ruby-zulip-client"
+  gem "zulip-client", path: "../ruby-zulip-client"
 end
