@@ -3,6 +3,7 @@ require "zulip/client"
 module Ruboty
   module Adapters
     class Zulip < Base
+      DEFAULT_RETRY_INTERVAL = 30
 
       env :ZULIP_SITE, "Zulip site URL"
       env :ZULIP_USERNAME, "Zulip username (email address)"
@@ -10,6 +11,7 @@ module Ruboty
       env :ZULIP_STREAM, "Zulip stream name to monitor", optional: true
       env :ZULIP_TOPIC, "Zulip topic name to monitor", optional: true
       env :ZULIP_USE_SSL, "Use SSL/TLS to access Zulip ", optional: true
+      env :RUBOTY_ZULIP_RETRY_INTERVAL, "Retry interval on connection error", optional: true
 
       def run
         listen
@@ -57,6 +59,12 @@ module Ruboty
         /true|yes/i === ENV.fetch("ZULIP_USE_SSL", "true")
       end
 
+      def retry_interval
+        interval = ENV['RUBOTY_ZULIP_RETRY_INTERVAL']
+        return interval.to_i if interval
+        DEFAULT_RETRY_INTERVAL
+      end
+
       def listen
         client.stream_message do |message|
           message[:body] = message[:content]
@@ -72,6 +80,11 @@ module Ruboty
       rescue ::Zulip::ResponseError => ex
         Ruboty.logger.warn("#{ex.class}: #{ex.message}\n#{ex.backtrace.join("\n")}")
         retry
+      rescue Faraday::ConnectionFailed, Faraday::TimeoutError => ex
+	Ruboty.logger.warn("#{ex.class}: #{ex.message}")
+	Ruboty.logger.debug("#{ex.backtrace.join("\n")}")
+	sleep retry_interval
+	retry
       end
 
       def display_recipient(message)
